@@ -58,22 +58,27 @@ GITHUB_TOPICS = [
 MIN_SCORE = 6  # items below this score are dropped — not worth a segment
 
 PODCAST_SCOPE = (
+    "The podcast is EDUCATIONAL first — the host wants listeners to learn something concrete and actionable. "
+    "Ideal topics: a new method or pattern being adopted across multiple projects in the wild "
+    "(e.g. Rust being used for agent management across many repos), a technique practitioners can apply, "
+    "a tool that changes how people work, or a research result with clear real-world implications.\n"
     "The podcast covers THREE equal pillars — do not over-represent any one:\n"
     "  1. Data Engineering (pipelines, orchestration, warehouses, dbt, Spark, Kafka, DuckDB…)\n"
     "  2. MLOps (deployment, monitoring, feature stores, model lifecycle, Weights & Biases…)\n"
     "  3. AI/LLM (only impactful releases or research — NOT every minor model update)\n"
-    "If all candidates are AI/LLM items, deprioritize the weakest ones to make room for data/MLOps topics. "
-    "Aim for variety: ideally at least one item per pillar when the content quality allows it."
+    "DEPRIORITIZE: opinion debates without technical substance, big-company announcements with no learnable content, "
+    "controversies and hot takes. The host is NOT looking for debate fodder."
 )
 
 SCORE_RUBRIC = (
-    "Score the PODCAST VALUE on a strict 1-10 scale:\n"
-    "  9-10 = unmissable — strong debate OR teaches a key concept, highly timely, practitioners will talk about it\n"
-    "   7-8 = solid segment — clear angle, practitioners care, worth 10 minutes\n"
-    "   5-6 = weak — no strong angle, do NOT include\n"
-    "   1-4 = skip — too niche, too old, no discussion value\n"
-    "Be strict. A slow news week means an empty list — that is the correct answer. "
-    "Never inflate scores to fill slots. An empty list is better than mediocre content."
+    "Score the PODCAST EDUCATIONAL VALUE on a strict 1-10 scale:\n"
+    "  9-10 = unmissable — teaches a clear concept or technique, the listener leaves with something actionable; "
+    "         bonus if a pattern is emerging across multiple independent projects\n"
+    "   7-8 = solid segment — a concrete method or tool to explain, practitioners will apply it\n"
+    "   5-6 = weak — mostly opinion, announcement without depth, or no clear take-away\n"
+    "   1-4 = skip — debate bait, PR fluff, minor update, nothing to teach\n"
+    "Be strict. A slow week means an empty list — that is the correct answer. "
+    "Never inflate scores. An empty list is better than mediocre content."
 )
 
 
@@ -303,7 +308,7 @@ async def scan_with_claude() -> dict | None:
         '"tech_zoom": "...", "why": "..."}]}\n'
         "source: exact source name (e.g. 'GitHub', 'ArXiv', 'Reddit r/MachineLearning', publication name). "
         "tech_zoom: 1-sentence technical focus. "
-        "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
+        "why: 1 sentence on WHAT THE LISTENER WILL LEARN — name the specific concept, method, or practice they can take away and apply. Not a debate framing."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -374,7 +379,7 @@ async def scan_with_mistral() -> dict:
         '"tech_zoom": "...", "why": "..."}]}\n'
         "source: exact source name (e.g. 'GitHub', 'ArXiv', 'Reddit r/MachineLearning'). "
         "tech_zoom: 1-sentence technical focus. "
-        "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
+        "why: 1 sentence on WHAT THE LISTENER WILL LEARN — name the specific concept, method, or practice they can take away and apply. Not a debate framing."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -402,13 +407,16 @@ async def brief_with_claude(req: BriefRequest) -> dict | None:
         return None
     prompt = (
         f"You are writing a segment brief for a French-language technical podcast on data/AI/MLOps.\n"
+        f"The host's style is EDUCATIONAL — listeners should leave with a concrete concept or method they can apply. "
+        f"Avoid debate framing. Focus on explaining the 'how' and 'why it works'.\n"
         f"News item: {req.title} (source: {req.source})\n"
         f"Tags: {', '.join(req.tags)}\n"
-        f"Why it matters: {req.why}\n\n"
+        f"What the listener will learn: {req.why}\n\n"
         "Return a JSON object (no markdown, raw JSON only) with this exact structure:\n"
         '{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
         '"tech_zoom": {"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}, '
-        '"talking_points": ["...", "...", "..."], "closing_question": "..."}'
+        '"talking_points": ["...", "...", "..."], "closing_question": "..."}\n'
+        "talking_points: 3 concrete pedagogical steps the host can walk through — explain the concept, show how it works, give a real example."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -446,13 +454,16 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
         raise HTTPException(status_code=503, detail="No AI API available")
     prompt = (
         f"You are writing a segment brief for a French-language technical podcast on data/AI/MLOps.\n"
+        f"The host's style is EDUCATIONAL — listeners should leave with a concrete concept or method they can apply. "
+        f"Avoid debate framing. Focus on explaining the 'how' and 'why it works'.\n"
         f"News item: {req.title} (source: {req.source})\n"
         f"Tags: {', '.join(req.tags)}\n"
-        f"Why it matters: {req.why}\n\n"
+        f"What the listener will learn: {req.why}\n\n"
         "Return a JSON object (no markdown, raw JSON only) with this exact structure:\n"
         '{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
         '"tech_zoom": {"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}, '
-        '"talking_points": ["...", "...", "..."], "closing_question": "..."}'
+        '"talking_points": ["...", "...", "..."], "closing_question": "..."}\n'
+        "talking_points: 3 concrete pedagogical steps the host can walk through — explain the concept, show how it works, give a real example."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
