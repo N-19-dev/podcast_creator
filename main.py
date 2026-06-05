@@ -22,14 +22,20 @@ GITHUB_API = "https://api.github.com/search/repositories"
 ARXIV_API = "https://export.arxiv.org/api/query"
 REDDIT_SUBS = ["MachineLearning", "dataengineering", "mlops"]
 RSS_FEEDS = [
-    ("TechCrunch AI",   "https://techcrunch.com/category/artificial-intelligence/feed/"),
-    ("VentureBeat AI",  "https://venturebeat.com/category/ai/feed/"),
-    ("InfoQ AI/ML",     "https://feed.infoq.com/ai-ml-data-eng/"),
-    ("The Batch",       "https://www.deeplearning.ai/the-batch/feed/"),
-    ("LangChain Blog",  "https://blog.langchain.dev/rss/"),
-    ("OpenAI Blog",     "https://openai.com/blog/rss.xml"),
-    ("Databricks Blog", "https://www.databricks.com/feed"),
-    ("Hugging Face Blog","https://huggingface.co/blog/feed.xml"),
+    # --- Data Engineering ---
+    ("dbt Blog",            "https://www.getdbt.com/blog/rss"),
+    ("Airbyte Blog",        "https://airbyte.com/blog/rss.xml"),
+    ("Databricks Blog",     "https://www.databricks.com/feed"),
+    ("InfoQ Data/Eng",      "https://feed.infoq.com/ai-ml-data-eng/"),
+    ("Towards Data Science","https://towardsdatascience.com/feed"),
+    # --- MLOps ---
+    ("Weights & Biases",    "https://wandb.ai/fully-connected/rss.xml"),
+    ("Evidently AI",        "https://www.evidentlyai.com/blog/rss"),
+    ("neptune.ai Blog",     "https://neptune.ai/blog/feed"),
+    # --- AI/LLM (limité) ---
+    ("The Batch",           "https://www.deeplearning.ai/the-batch/feed/"),
+    ("Hugging Face Blog",   "https://huggingface.co/blog/feed.xml"),
+    ("OpenAI Blog",         "https://openai.com/blog/rss.xml"),
 ]
 
 HN_KEYWORDS = {
@@ -41,11 +47,24 @@ HN_KEYWORDS = {
 }
 
 GITHUB_TOPICS = [
-    "llm", "mlops", "data-engineering", "machine-learning",
-    "rag", "vector-database", "dbt", "data-pipeline",
+    # Data Engineering
+    "data-engineering", "dbt", "data-pipeline", "apache-spark",
+    # MLOps
+    "mlops", "model-monitoring", "feature-store",
+    # AI/LLM (volontairement limité)
+    "llm", "rag",
 ]
 
 MIN_SCORE = 6  # items below this score are dropped — not worth a segment
+
+PODCAST_SCOPE = (
+    "The podcast covers THREE equal pillars — do not over-represent any one:\n"
+    "  1. Data Engineering (pipelines, orchestration, warehouses, dbt, Spark, Kafka, DuckDB…)\n"
+    "  2. MLOps (deployment, monitoring, feature stores, model lifecycle, Weights & Biases…)\n"
+    "  3. AI/LLM (only impactful releases or research — NOT every minor model update)\n"
+    "If all candidates are AI/LLM items, deprioritize the weakest ones to make room for data/MLOps topics. "
+    "Aim for variety: ideally at least one item per pillar when the content quality allows it."
+)
 
 SCORE_RUBRIC = (
     "Score the PODCAST VALUE on a strict 1-10 scale:\n"
@@ -53,9 +72,7 @@ SCORE_RUBRIC = (
     "   7-8 = solid segment — clear angle, practitioners care, worth 10 minutes\n"
     "   5-6 = weak — no strong angle, do NOT include\n"
     "   1-4 = skip — too niche, too old, no discussion value\n"
-    "Be strict and conservative. If a Hacker News item is just a link dump or minor release, score it low. "
-    "Prefer GitHub repos that introduce a genuinely new tool or practice over HN articles about things already well-known. "
-    "A slow week means an empty or near-empty list — that is the correct answer. "
+    "Be strict. A slow news week means an empty list — that is the correct answer. "
     "Never inflate scores to fill slots. An empty list is better than mediocre content."
 )
 
@@ -275,9 +292,10 @@ async def scan_with_claude() -> dict | None:
 
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        "Search the web for the latest news in data engineering, AI, or MLOps this week. "
+        f"{PODCAST_SCOPE}\n"
+        "Search the web for the latest news this week. "
         f"Also consider these pre-fetched sources:{extra_context}\n"
-        "Select the best items across all sources (web search + GitHub + ArXiv + Reddit). "
+        "Select the best items across all sources (web search + GitHub + ArXiv + Reddit + RSS blogs). "
         f"{SCORE_RUBRIC}\n"
         "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
@@ -346,8 +364,9 @@ async def scan_with_mistral() -> dict:
 
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
+        f"{PODCAST_SCOPE}\n"
         f"Here are recent items from multiple sources:\n\n{context_text}"
-        "Select the best items across all sources. "
+        "Select the best items across all sources, respecting the pillar balance above. "
         f"{SCORE_RUBRIC}\n"
         "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
         "Return a JSON object (no markdown, raw JSON only):\n"
