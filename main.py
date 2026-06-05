@@ -55,35 +55,42 @@ GITHUB_TOPICS = [
     "llm", "rag",
 ]
 
-MIN_SCORE = 6  # items below this score are dropped — not worth a segment
+MIN_SCORE = 7  # raised — only genuinely interesting topics pass
 
 PODCAST_SCOPE = (
-    "The podcast is EDUCATIONAL first — the host wants listeners to learn something concrete and actionable.\n"
-    "IDEAL topics (score high):\n"
-    "  - A new method or pattern emerging across multiple independent projects "
-    "(e.g. Rust being adopted for agent management in many repos)\n"
-    "  - A new capability that introduces a new ARCHITECTURAL PATTERN practitioners can learn and apply "
-    "(e.g. Claude dynamic workflows — a new way to structure agents worth explaining step by step)\n"
-    "  - A tool or technique that can be demoed, explained, and applied by the listener's team\n"
-    "DISTINCTION for big-company announcements: ONLY include if it introduces a new technical concept "
-    "worth explaining (new pattern, new API capability, new architecture). "
-    "EXCLUDE if it is purely business news (funding, partnerships, market share) with nothing to teach.\n"
-    "The podcast covers THREE equal pillars — do not over-represent any one:\n"
-    "  1. Data Engineering (pipelines, orchestration, warehouses, dbt, Spark, Kafka, DuckDB…)\n"
+    "TONE: this podcast sounds like a conversation between two data engineers at a bar — "
+    "casual, curious, a bit excited. The energy is 't'as vu ce truc ? c'est dingue parce que…' "
+    "NOT a press release, NOT a lecture. The listener should feel like they're hearing something cool "
+    "from a friend who just found it.\n\n"
+    "BAR TEST — ask yourself: would a data engineer genuinely bring this up with a colleague over a drink? "
+    "Would they say 'attends, t'as vu ce que X a sorti ?' If yes: good topic. "
+    "If it sounds like something from a corporate newsletter: skip.\n\n"
+    "IDEAL topics:\n"
+    "  - An emerging pattern spotted across multiple independent repos "
+    "(e.g. Rust showing up everywhere for agent management — why is that?)\n"
+    "  - A new capability that introduces a new architectural pattern you can actually show "
+    "(e.g. Claude dynamic workflows — changes how you structure agents, you can demo it)\n"
+    "  - A tool or trick that makes you go 'wait, this is way simpler than I thought'\n"
+    "  - A surprising benchmark or result that challenges what everyone assumed\n\n"
+    "DISTINCTION for big-company releases: ONLY if it introduces a genuinely new technical concept "
+    "worth explaining (new pattern, new capability, new architecture). "
+    "SKIP if it's funding news, market share, or a minor model update with no architectural novelty.\n\n"
+    "THREE equal pillars:\n"
+    "  1. Data Engineering (dbt, Spark, Kafka, DuckDB, orchestration, warehouses…)\n"
     "  2. MLOps (deployment, monitoring, feature stores, model lifecycle, observability…)\n"
-    "  3. AI/LLM (only when introducing a new architectural pattern or capability — not every model release)\n"
-    "DEPRIORITIZE: opinion debates, funding news, benchmark wars, controversies, hot takes without technical depth."
+    "  3. AI/LLM (only architectural patterns and capabilities — not every release)\n"
+    "SKIP: opinion debates, funding news, benchmark wars, PR fluff, anything already discussed for weeks."
 )
 
 SCORE_RUBRIC = (
-    "Score the PODCAST EDUCATIONAL VALUE on a strict 1-10 scale:\n"
-    "  9-10 = unmissable — teaches a clear concept or technique, the listener leaves with something actionable; "
-    "         bonus if a pattern is emerging across multiple independent projects\n"
-    "   7-8 = solid segment — a concrete method or tool to explain, practitioners will apply it\n"
-    "   5-6 = weak — mostly opinion, announcement without depth, or no clear take-away\n"
-    "   1-4 = skip — debate bait, PR fluff, minor update, nothing to teach\n"
-    "Be strict. A slow week means an empty list — that is the correct answer. "
-    "Never inflate scores. An empty list is better than mediocre content."
+    "Score with the BAR TEST — would a senior data engineer genuinely bring this up with a friend over a drink?\n"
+    "  9-10 = 'attends t'as vu ça ?!' — surprising, novel, makes you want to try it immediately; "
+    "         pattern emerging in the wild OR new capability that changes how you build things\n"
+    "   7-8 = good topic — concrete enough to explain and demo, something you'd mention casually\n"
+    "   5-6 = meh — not surprising, already known, or too abstract to make concrete\n"
+    "   1-4 = skip — press release energy, funding news, benchmark war, already everywhere\n"
+    "Be strict. An empty list is better than a list of mediocre topics. "
+    "If it sounds like a LinkedIn post, score it 1-4."
 )
 
 
@@ -412,16 +419,18 @@ async def brief_with_claude(req: BriefRequest) -> dict | None:
         return None
     prompt = (
         f"You are writing a segment brief for a French-language technical podcast on data/AI/MLOps.\n"
-        f"The host's style is EDUCATIONAL — listeners should leave with a concrete concept or method they can apply. "
-        f"Avoid debate framing. Focus on explaining the 'how' and 'why it works'.\n"
+        f"Tone: casual conversation between two data engineers at a bar — curious, a bit excited, zero corporate speak. "
+        f"Like 'attends, t'as vu ce truc ? c'est dingue parce que…' Not a lecture, not a press release.\n"
         f"News item: {req.title} (source: {req.source})\n"
         f"Tags: {', '.join(req.tags)}\n"
-        f"What the listener will learn: {req.why}\n\n"
+        f"What makes it interesting: {req.why}\n\n"
         "Return a JSON object (no markdown, raw JSON only) with this exact structure:\n"
         '{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
         '"tech_zoom": {"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}, '
         '"talking_points": ["...", "...", "..."], "closing_question": "..."}\n'
-        "talking_points: 3 concrete pedagogical steps the host can walk through — explain the concept, show how it works, give a real example."
+        "hook: 1-2 sentences that sound like something you'd say to open the topic at a bar — surprising, concrete, makes the listener lean in.\n"
+        "talking_points: 3 points that walk through the concept naturally — what it is, why it's cool, what you'd do with it.\n"
+        "closing_question: something you'd genuinely ask a colleague, not a formal wrap-up."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -459,16 +468,18 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
         raise HTTPException(status_code=503, detail="No AI API available")
     prompt = (
         f"You are writing a segment brief for a French-language technical podcast on data/AI/MLOps.\n"
-        f"The host's style is EDUCATIONAL — listeners should leave with a concrete concept or method they can apply. "
-        f"Avoid debate framing. Focus on explaining the 'how' and 'why it works'.\n"
+        f"Tone: casual conversation between two data engineers at a bar — curious, a bit excited, zero corporate speak. "
+        f"Like 'attends, t'as vu ce truc ? c'est dingue parce que…' Not a lecture, not a press release.\n"
         f"News item: {req.title} (source: {req.source})\n"
         f"Tags: {', '.join(req.tags)}\n"
-        f"What the listener will learn: {req.why}\n\n"
+        f"What makes it interesting: {req.why}\n\n"
         "Return a JSON object (no markdown, raw JSON only) with this exact structure:\n"
         '{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
         '"tech_zoom": {"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}, '
         '"talking_points": ["...", "...", "..."], "closing_question": "..."}\n'
-        "talking_points: 3 concrete pedagogical steps the host can walk through — explain the concept, show how it works, give a real example."
+        "hook: 1-2 sentences that sound like something you'd say to open the topic at a bar — surprising, concrete, makes the listener lean in.\n"
+        "talking_points: 3 points that walk through the concept naturally — what it is, why it's cool, what you'd do with it.\n"
+        "closing_question: something you'd genuinely ask a colleague, not a formal wrap-up."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
