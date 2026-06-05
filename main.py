@@ -307,7 +307,8 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
 
 
 def filter_news(result: dict) -> dict:
-    result["news"] = [n for n in result.get("news", []) if n.get("score", 0) >= MIN_SCORE]
+    news = [n for n in result.get("news", []) if n.get("score", 0) >= MIN_SCORE]
+    result["news"] = sorted(news, key=lambda n: n.get("score", 0), reverse=True)
     return result
 
 
