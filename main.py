@@ -95,6 +95,7 @@ async def fetch_hn_news() -> list[dict]:
 
 async def fetch_github_trending() -> list[dict]:
     since = (date.today() - timedelta(days=14)).isoformat()
+    seen_urls: set[str] = set()
     results = []
     async with httpx.AsyncClient(timeout=20) as client:
         for topic in GITHUB_TOPICS[:4]:
@@ -103,39 +104,54 @@ async def fetch_github_trending() -> list[dict]:
                     GITHUB_API,
                     headers={"Accept": "application/vnd.github+json"},
                     params={
-                        "q": f"topic:{topic} pushed:>{since} stars:>50",
+                        "q": f"topic:{topic} pushed:>{since} stars:>10",
                         "sort": "stars",
                         "order": "desc",
-                        "per_page": 3,
+                        "per_page": 4,
                     },
                 )
                 if resp.status_code != 200:
                     continue
                 for repo in resp.json().get("items", []):
+                    url = repo["html_url"]
+                    if url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                    desc = repo.get("description") or ""
                     results.append({
                         "source": "GitHub",
-                        "title": f"{repo['full_name']} — {repo.get('description', '')}",
-                        "url": repo["html_url"],
+                        "title": f"{repo['full_name']} — {desc}",
+                        "url": url,
                         "description": (
-                            f"★ {repo.get('stargazers_count', 0)} stars "
-                            f"({repo.get('stargazers_count', 0) - repo.get('watchers_count', 0):+d} recent) — "
+                            f"★ {repo.get('stargazers_count', 0)} stars — "
                             f"topics: {', '.join(repo.get('topics', [])[:5])}"
                         ),
                     })
             except Exception:
                 continue
-    return results[:8]
+    return results[:12]
 
 
 async def scan_with_claude() -> dict | None:
     if not ANTHROPIC_API_KEY:
         return None
+    gh_items = await fetch_github_trending()
+    gh_context = ""
+    if gh_items:
+        gh_lines = "\n".join(
+            f"- {item['title']} ({item['url']}): {item['description']}"
+            for item in gh_items
+        )
+        gh_context = f"\n\nHere are trending GitHub repos fetched right now — consider them alongside your web search results:\n{gh_lines}"
+
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        "Search the web AND GitHub for items from this week in data engineering, AI, or MLOps. "
-        "Include trending GitHub repos if they represent a new tool, pattern, or practice worth discussing. "
+        "Search the web for the latest news in data engineering, AI, or MLOps this week."
+        f"{gh_context}\n\n"
+        "Combine web search results and the GitHub repos above to select the best items. "
+        "A GitHub repo counts as a valid item if it represents a new tool or practice worth discussing. "
         f"{SCORE_RUBRIC}\n"
-        "Return only items scoring 7 or above. Return fewer than 5 if the week doesn't have enough strong content — an empty list is valid. "
+        "Return only items scoring 7 or above. Return fewer than 5 if the week doesn't warrant it — an empty list is valid. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
