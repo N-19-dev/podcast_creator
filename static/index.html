@@ -259,6 +259,19 @@
     }
     .brief-source-link a:hover { color: var(--text); }
 
+    .concepts-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .concept-item { display: flex; flex-direction: column; gap: 3px; }
+
+    .concept-term {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--claude);
+      letter-spacing: 0.02em;
+    }
+
+    .concept-explanation { font-size: 13px; color: var(--text); line-height: 1.6; }
+
     .mini-project { border-color: rgba(122,224,90,0.3); background: rgba(122,224,90,0.04); }
 
     .mp-goal { font-size: 13px; margin-bottom: 12px; color: var(--claude); }
@@ -536,7 +549,27 @@
         <ul id="tp-text">${(brief.talking_points || []).map(tp => `<li>${escHtml(tp)}</li>`).join('')}</ul>
       </div>
       ${briefSection('Question finale', escHtml(brief.closing_question), 'closing-text')}
+      ${renderConcepts(brief.concepts)}
       ${renderMiniProject(brief.mini_project)}
+    `;
+  }
+
+  function renderConcepts(concepts) {
+    if (!concepts || concepts.length === 0) return '';
+    const items = concepts.map(c => `
+      <div class="concept-item">
+        <span class="concept-term">${escHtml(c.term)}</span>
+        <span class="concept-explanation">${escHtml(c.explanation)}</span>
+      </div>
+    `).join('');
+    return `
+      <div class="brief-section">
+        <div class="brief-section-header">
+          <span class="brief-section-label">Concepts clés</span>
+          <button class="btn-copy" onclick="copySection('concepts-text', this)">Copier</button>
+        </div>
+        <div id="concepts-text" class="concepts-list">${items}</div>
+      </div>
     `;
   }
 

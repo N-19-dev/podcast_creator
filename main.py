@@ -436,7 +436,8 @@ async def brief_with_claude(req: BriefRequest) -> dict | None:
         '{{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
         '"tech_zoom": {{"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}}, '
         '"talking_points": ["...", "...", "..."], "closing_question": "...", '
-        '"mini_project": {{"title": "...", "goal": "...", "steps": ["...", "...", "...", "..."]}}}}\n\n'
+        '"mini_project": {{"title": "...", "goal": "...", "steps": ["...", "...", "...", "..."]}}, '
+        '"concepts": [{{"term": "...", "explanation": "..."}}]}}\n\n'
         "hook: 1-2 sentences max, the way you'd open this topic with a friend — punchy and concrete.\n"
         "news_summary: 2-3 sentences explaining what happened, plain language.\n"
         "practitioner_angle: 1-2 sentences on why a data engineer or ML practitioner cares.\n"
@@ -447,7 +448,11 @@ async def brief_with_claude(req: BriefRequest) -> dict | None:
         "closing_question: 1 casual question you'd throw to the listener, like 'et vous vous l'utiliseriez comment ?'\n"
         "mini_project: a small hands-on project (30min–2h) to actually try the concept. "
         "title: short project name. goal: 1 sentence on what you'll prove. "
-        "steps: 3-5 concrete steps with specific tools/commands/code snippets where relevant — no vague instructions."
+        "steps: 3-5 concrete steps with specific tools/commands/code snippets where relevant — no vague instructions.\n"
+        "concepts: list EVERY technical term used anywhere in this brief that a listener might not know. "
+        "For each: term (the exact word/acronym), explanation (1-2 sentences in plain French, no jargon). "
+        "Include even terms that seem obvious — better to over-explain than leave someone lost. "
+        "Minimum 3 concepts, no maximum."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -495,7 +500,8 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
         '{{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
         '"tech_zoom": {{"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}}, '
         '"talking_points": ["...", "...", "..."], "closing_question": "...", '
-        '"mini_project": {{"title": "...", "goal": "...", "steps": ["...", "...", "...", "..."]}}}}\n\n'
+        '"mini_project": {{"title": "...", "goal": "...", "steps": ["...", "...", "...", "..."]}}, '
+        '"concepts": [{{"term": "...", "explanation": "..."}}]}}\n\n'
         "hook: 1-2 sentences max, the way you'd open this topic with a friend — punchy and concrete.\n"
         "news_summary: 2-3 sentences explaining what happened, plain language.\n"
         "practitioner_angle: 1-2 sentences on why a data engineer or ML practitioner cares.\n"
@@ -506,7 +512,11 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
         "closing_question: 1 casual question you'd throw to the listener, like 'et vous vous l'utiliseriez comment ?'\n"
         "mini_project: a small hands-on project (30min–2h) to actually try the concept. "
         "title: short project name. goal: 1 sentence on what you'll prove. "
-        "steps: 3-5 concrete steps with specific tools/commands/code snippets where relevant — no vague instructions."
+        "steps: 3-5 concrete steps with specific tools/commands/code snippets where relevant — no vague instructions.\n"
+        "concepts: list EVERY technical term used anywhere in this brief that a listener might not know. "
+        "For each: term (the exact word/acronym), explanation (1-2 sentences in plain French, no jargon). "
+        "Include even terms that seem obvious — better to over-explain than leave someone lost. "
+        "Minimum 3 concepts, no maximum."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
