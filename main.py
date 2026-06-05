@@ -19,6 +19,18 @@ ANTHROPIC_BASE = "https://api.anthropic.com/v1"
 MISTRAL_BASE = "https://api.mistral.ai/v1"
 HN_BASE = "https://hacker-news.firebaseio.com/v0"
 GITHUB_API = "https://api.github.com/search/repositories"
+ARXIV_API = "https://export.arxiv.org/api/query"
+REDDIT_SUBS = ["MachineLearning", "dataengineering", "mlops"]
+RSS_FEEDS = [
+    ("TechCrunch AI",   "https://techcrunch.com/category/artificial-intelligence/feed/"),
+    ("VentureBeat AI",  "https://venturebeat.com/category/ai/feed/"),
+    ("InfoQ AI/ML",     "https://feed.infoq.com/ai-ml-data-eng/"),
+    ("The Batch",       "https://www.deeplearning.ai/the-batch/feed/"),
+    ("LangChain Blog",  "https://blog.langchain.dev/rss/"),
+    ("OpenAI Blog",     "https://openai.com/blog/rss.xml"),
+    ("Databricks Blog", "https://www.databricks.com/feed"),
+    ("Hugging Face Blog","https://huggingface.co/blog/feed.xml"),
+]
 
 HN_KEYWORDS = {
     "data", "ml", "ai", "llm", "mlops", "dbt", "spark", "kafka", "flink",
@@ -134,31 +146,144 @@ async def fetch_github_trending() -> list[dict]:
     return results[:12]
 
 
+async def fetch_arxiv_papers() -> list[dict]:
+    import xml.etree.ElementTree as ET
+    since = (date.today() - timedelta(days=7)).strftime("%Y%m%d")
+    query = "cat:cs.LG OR cat:cs.AI OR cat:cs.DB"
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                ARXIV_API,
+                params={
+                    "search_query": query,
+                    "sortBy": "submittedDate",
+                    "sortOrder": "descending",
+                    "max_results": 8,
+                },
+            )
+            resp.raise_for_status()
+        ns = "http://www.w3.org/2005/Atom"
+        root = ET.fromstring(resp.text)
+        results = []
+        for entry in root.findall(f"{{{ns}}}entry"):
+            title = entry.findtext(f"{{{ns}}}title", "").strip().replace("\n", " ")
+            summary = entry.findtext(f"{{{ns}}}summary", "").strip()[:200].replace("\n", " ")
+            url = entry.findtext(f"{{{ns}}}id", "").strip()
+            authors = [a.findtext(f"{{{ns}}}name", "") for a in entry.findall(f"{{{ns}}}author")]
+            results.append({
+                "source": "ArXiv",
+                "title": title,
+                "url": url,
+                "description": f"{summary}… — {', '.join(authors[:2])}",
+            })
+        return results
+    except Exception:
+        return []
+
+
+async def fetch_rss_feeds() -> list[dict]:
+    import xml.etree.ElementTree as ET
+    results = []
+    cutoff = date.today() - timedelta(days=7)
+
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        for source_name, url in RSS_FEEDS:
+            try:
+                resp = await client.get(url, headers={"User-Agent": "podcast-brief-bot/1.0"})
+                if resp.status_code != 200:
+                    continue
+                root = ET.fromstring(resp.text)
+                # Handle both RSS <item> and Atom <entry>
+                ns = {"atom": "http://www.w3.org/2005/Atom"}
+                items = root.findall(".//item") or root.findall(".//atom:entry", ns)
+                for item in items[:3]:
+                    title = (
+                        item.findtext("title")
+                        or item.findtext("atom:title", namespaces=ns)
+                        or ""
+                    ).strip()
+                    link = (
+                        item.findtext("link")
+                        or (item.find("atom:link", ns).get("href") if item.find("atom:link", ns) is not None else "")
+                        or ""
+                    ).strip()
+                    desc = (
+                        item.findtext("description")
+                        or item.findtext("atom:summary", namespaces=ns)
+                        or ""
+                    ).strip()[:180].replace("\n", " ")
+                    if title and link:
+                        results.append({
+                            "source": source_name,
+                            "title": title,
+                            "url": link,
+                            "description": desc,
+                        })
+            except Exception:
+                continue
+    return results
+
+
+async def fetch_reddit_posts() -> list[dict]:
+    results = []
+    async with httpx.AsyncClient(
+        timeout=15,
+        headers={"User-Agent": "podcast-brief-bot/1.0"},
+    ) as client:
+        for sub in REDDIT_SUBS:
+            try:
+                resp = await client.get(
+                    f"https://www.reddit.com/r/{sub}/hot.json",
+                    params={"limit": 5},
+                )
+                if resp.status_code != 200:
+                    continue
+                for post in resp.json().get("data", {}).get("children", []):
+                    d = post["data"]
+                    if d.get("stickied") or d.get("is_self") and len(d.get("selftext", "")) < 100:
+                        continue
+                    results.append({
+                        "source": f"Reddit r/{sub}",
+                        "title": d.get("title", ""),
+                        "url": d.get("url", ""),
+                        "description": f"↑ {d.get('score', 0)} — {d.get('num_comments', 0)} comments",
+                    })
+            except Exception:
+                continue
+    return results
+
+
 async def scan_with_claude() -> dict | None:
     if not ANTHROPIC_API_KEY:
         return None
-    gh_items = await fetch_github_trending()
-    gh_context = ""
-    if gh_items:
-        gh_lines = "\n".join(
-            f"- {item['title']} ({item['url']}): {item['description']}"
-            for item in gh_items
-        )
-        gh_context = f"\n\nHere are trending GitHub repos fetched right now — consider them alongside your web search results:\n{gh_lines}"
+    gh_items, arxiv_items, reddit_items, rss_items = await asyncio.gather(
+        fetch_github_trending(), fetch_arxiv_papers(), fetch_reddit_posts(), fetch_rss_feeds()
+    )
+
+    def fmt_section(label: str, items: list[dict]) -> str:
+        if not items:
+            return ""
+        lines = "\n".join(f"- [{i['source']}] {i['title']} ({i['url']}): {i['description']}" for i in items)
+        return f"\n## {label}\n{lines}\n"
+
+    extra_context = (
+        fmt_section("Industry News (TechCrunch, VentureBeat, InfoQ, OpenAI, HuggingFace…)", rss_items)
+        + fmt_section("GitHub Trending (new tools & practices)", gh_items)
+        + fmt_section("ArXiv Papers (recent research)", arxiv_items)
+        + fmt_section("Reddit (community discussion)", reddit_items)
+    )
 
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        "Search the web for the latest news in data engineering, AI, or MLOps this week."
-        f"{gh_context}\n\n"
-        "Combine web search results and the GitHub repos above to select the best items. "
-        "A GitHub repo counts as a valid item if it introduces a genuinely new tool or practice. "
-        "Hacker News items need a strong discussion angle to qualify — a link to a known library update is not enough. "
+        "Search the web for the latest news in data engineering, AI, or MLOps this week. "
+        f"Also consider these pre-fetched sources:{extra_context}\n"
+        "Select the best items across all sources (web search + GitHub + ArXiv + Reddit). "
         f"{SCORE_RUBRIC}\n"
         "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
-        "source: publication name or 'GitHub'. "
+        "source: exact source name (e.g. 'GitHub', 'ArXiv', 'Reddit r/MachineLearning', publication name). "
         "tech_zoom: 1-sentence technical focus. "
         "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
     )
@@ -198,32 +323,37 @@ async def scan_with_claude() -> dict | None:
 async def scan_with_mistral() -> dict:
     if not MISTRAL_API_KEY:
         raise HTTPException(status_code=503, detail="No AI API available")
-    hn_items, gh_items = await asyncio.gather(fetch_hn_news(), fetch_github_trending())
+    gh_items, arxiv_items, reddit_items, rss_items, hn_items = await asyncio.gather(
+        fetch_github_trending(), fetch_arxiv_papers(), fetch_reddit_posts(), fetch_rss_feeds(), fetch_hn_news()
+    )
 
-    def fmt(items: list[dict]) -> str:
-        return "\n".join(
-            f"- [{item['source']}] {item['title']} ({item['url']}): {item['description']}"
-            for item in items
+    def fmt_section(label: str, items: list[dict]) -> str:
+        if not items:
+            return ""
+        lines = "\n".join(
+            f"- [{i['source']}] {i['title']} ({i['url']}): {i['description']}"
+            for i in items
         )
+        return f"## {label}\n{lines}\n\n"
 
-    context_text = ""
-    if gh_items:
-        context_text += f"## GitHub Trending (priority source)\n{fmt(gh_items)}\n\n"
-    if hn_items:
-        context_text += f"## Hacker News (secondary source — high bar required)\n{fmt(hn_items)}\n"
-    if not context_text:
-        context_text = "No external results available."
+    context_text = (
+        fmt_section("Industry News (TechCrunch, VentureBeat, InfoQ, OpenAI, HuggingFace…)", rss_items)
+        + fmt_section("GitHub Trending (new tools & practices)", gh_items)
+        + fmt_section("ArXiv Papers (recent research)", arxiv_items)
+        + fmt_section("Reddit (community discussion)", reddit_items)
+        + fmt_section("Hacker News (secondary — high bar)", hn_items)
+    ) or "No external results available."
 
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        f"Here are recent items — GitHub repos are the priority source, Hacker News is secondary:\n\n{context_text}\n"
-        "An HN item must have a strong discussion angle to qualify — a minor release or link dump does not. "
+        f"Here are recent items from multiple sources:\n\n{context_text}"
+        "Select the best items across all sources. "
         f"{SCORE_RUBRIC}\n"
         "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
         "Return a JSON object (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
-        "source: publication name or 'GitHub'. "
+        "source: exact source name (e.g. 'GitHub', 'ArXiv', 'Reddit r/MachineLearning'). "
         "tech_zoom: 1-sentence technical focus. "
         "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
     )

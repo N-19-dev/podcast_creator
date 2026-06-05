@@ -180,8 +180,11 @@
       border-radius: 4px;
       letter-spacing: 0.04em;
     }
-    .source-badge.github { background: rgba(255,255,255,0.08); color: #e8f0e3; }
-    .source-badge.hn     { background: rgba(255,102,0,0.15);  color: #ff8c42; }
+    .source-badge.github  { background: rgba(255,255,255,0.08); color: #e8f0e3; }
+    .source-badge.hn      { background: rgba(255,102,0,0.15);  color: #ff8c42; }
+    .source-badge.arxiv   { background: rgba(180,100,255,0.15); color: #c9a0f5; }
+    .source-badge.reddit  { background: rgba(255,69,0,0.15);    color: #ff6b35; }
+    .source-badge.rss     { background: rgba(0,180,150,0.15);   color: #4ecdc4; }
 
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
@@ -542,7 +545,11 @@
     const s = source.toLowerCase();
     if (s === 'github') return '<span class="source-badge github">GitHub</span>';
     if (s === 'hacker news') return '<span class="source-badge hn">HN</span>';
-    return '';
+    if (s === 'arxiv') return '<span class="source-badge arxiv">ArXiv</span>';
+    if (s.startsWith('reddit')) return '<span class="source-badge reddit">Reddit</span>';
+    if (['techcrunch ai','venturebeat ai','infoq ai/ml','the batch','langchain blog','openai blog','databricks blog','hugging face blog'].includes(s))
+      return '<span class="source-badge rss">Blog</span>';
+    return '<span class="source-badge rss">RSS</span>';
   }
 
   function escHtml(str) {
