@@ -33,6 +33,18 @@ GITHUB_TOPICS = [
     "rag", "vector-database", "dbt", "data-pipeline",
 ]
 
+MIN_SCORE = 6  # items below this score are dropped — not worth a segment
+
+SCORE_RUBRIC = (
+    "Score the PODCAST VALUE on a strict 1-10 scale:\n"
+    "  9-10 = unmissable — strong debate OR teaches a key concept, highly timely, practitioners will talk about it\n"
+    "   7-8 = solid segment — clear angle, practitioners care, worth 10 minutes\n"
+    "   5-6 = weak — possible filler, no strong angle\n"
+    "   1-4 = skip — too niche, too old, no discussion value\n"
+    "Be strict: a slow news week should produce low scores, not inflated ones. "
+    "Never give 9+ just because something is recent. Never pad to reach 5 items."
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -120,13 +132,14 @@ async def scan_with_claude() -> dict | None:
         return None
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        "Search the web AND GitHub for the top 5 items from this week in data engineering, AI, or MLOps. "
+        "Search the web AND GitHub for items from this week in data engineering, AI, or MLOps. "
         "Include trending GitHub repos if they represent a new tool, pattern, or practice worth discussing. "
+        f"{SCORE_RUBRIC}\n"
+        "Return only items scoring 7 or above. Return fewer than 5 if the week doesn't have enough strong content — an empty list is valid. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
-        "source: the publication name or 'GitHub' for repos. "
-        "score 1-10: rate PODCAST VALUE — does it spark debate? can we teach a concept from it? will practitioners change how they work? is it timely? "
+        "source: publication name or 'GitHub'. "
         "tech_zoom: 1-sentence technical focus. "
         "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
     )
@@ -185,11 +198,12 @@ async def scan_with_mistral() -> dict:
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
         f"Here are recent items from Hacker News and GitHub trending repos:\n\n{context_text}\n"
-        "Pick the top 5 items (mix of news and GitHub repos is fine) and return a JSON object (no markdown, raw JSON only):\n"
+        f"{SCORE_RUBRIC}\n"
+        "Return only items scoring 7 or above. Return fewer than 5 if the content doesn't warrant it — an empty list is valid. "
+        "Return a JSON object (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
         "source: publication name or 'GitHub'. "
-        "score 1-10: rate PODCAST VALUE — debate potential, teachable concept, new practice, practitioner impact, timeliness. "
         "tech_zoom: 1-sentence technical focus. "
         "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
     )
@@ -292,15 +306,20 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
         return parsed
 
 
+def filter_news(result: dict) -> dict:
+    result["news"] = [n for n in result.get("news", []) if n.get("score", 0) >= MIN_SCORE]
+    return result
+
+
 @app.post("/api/scan")
 async def scan():
     try:
         result = await scan_with_claude()
         if result:
-            return result
+            return filter_news(result)
     except Exception:
         pass
-    return await scan_with_mistral()
+    return filter_news(await scan_with_mistral())
 
 
 @app.post("/api/brief")

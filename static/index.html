@@ -398,6 +398,17 @@
     document.getElementById('btn-brief').disabled = true;
     const list = document.getElementById('news-list');
     list.innerHTML = '';
+
+    if (!news || news.length === 0) {
+      list.innerHTML = `
+        <div class="scan-intro">
+          <p style="color:var(--muted)">Rien de suffisamment percutant cette semaine.<br>
+          Aucun sujet n'a atteint le seuil de qualité pour le podcast.<br>
+          Réessaie dans quelques jours ou relance le scan.</p>
+        </div>`;
+      return;
+    }
+
     news.forEach((item, i) => {
       const card = document.createElement('div');
       card.className = 'news-card';
