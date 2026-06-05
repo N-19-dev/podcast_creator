@@ -39,10 +39,12 @@ SCORE_RUBRIC = (
     "Score the PODCAST VALUE on a strict 1-10 scale:\n"
     "  9-10 = unmissable — strong debate OR teaches a key concept, highly timely, practitioners will talk about it\n"
     "   7-8 = solid segment — clear angle, practitioners care, worth 10 minutes\n"
-    "   5-6 = weak — possible filler, no strong angle\n"
+    "   5-6 = weak — no strong angle, do NOT include\n"
     "   1-4 = skip — too niche, too old, no discussion value\n"
-    "Be strict: a slow news week should produce low scores, not inflated ones. "
-    "Never give 9+ just because something is recent. Never pad to reach 5 items."
+    "Be strict and conservative. If a Hacker News item is just a link dump or minor release, score it low. "
+    "Prefer GitHub repos that introduce a genuinely new tool or practice over HN articles about things already well-known. "
+    "A slow week means an empty or near-empty list — that is the correct answer. "
+    "Never inflate scores to fill slots. An empty list is better than mediocre content."
 )
 
 
@@ -88,9 +90,9 @@ async def fetch_hn_news() -> list[dict]:
                 "url": s.get("url", f"https://news.ycombinator.com/item?id={s['id']}"),
                 "description": f"HN score: {s.get('score', 0)} — {s.get('descendants', 0)} comments",
             })
-        if len(results) >= 10:
+        if len(results) >= 5:
             break
-    return results[:10]
+    return results[:5]
 
 
 async def fetch_github_trending() -> list[dict]:
@@ -149,9 +151,10 @@ async def scan_with_claude() -> dict | None:
         "Search the web for the latest news in data engineering, AI, or MLOps this week."
         f"{gh_context}\n\n"
         "Combine web search results and the GitHub repos above to select the best items. "
-        "A GitHub repo counts as a valid item if it represents a new tool or practice worth discussing. "
+        "A GitHub repo counts as a valid item if it introduces a genuinely new tool or practice. "
+        "Hacker News items need a strong discussion angle to qualify — a link to a known library update is not enough. "
         f"{SCORE_RUBRIC}\n"
-        "Return only items scoring 7 or above. Return fewer than 5 if the week doesn't warrant it — an empty list is valid. "
+        "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
@@ -204,18 +207,19 @@ async def scan_with_mistral() -> dict:
         )
 
     context_text = ""
-    if hn_items:
-        context_text += f"## Hacker News\n{fmt(hn_items)}\n\n"
     if gh_items:
-        context_text += f"## GitHub Trending\n{fmt(gh_items)}\n"
+        context_text += f"## GitHub Trending (priority source)\n{fmt(gh_items)}\n\n"
+    if hn_items:
+        context_text += f"## Hacker News (secondary source — high bar required)\n{fmt(hn_items)}\n"
     if not context_text:
         context_text = "No external results available."
 
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        f"Here are recent items from Hacker News and GitHub trending repos:\n\n{context_text}\n"
+        f"Here are recent items — GitHub repos are the priority source, Hacker News is secondary:\n\n{context_text}\n"
+        "An HN item must have a strong discussion angle to qualify — a minor release or link dump does not. "
         f"{SCORE_RUBRIC}\n"
-        "Return only items scoring 7 or above. Return fewer than 5 if the content doesn't warrant it — an empty list is valid. "
+        "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
         "Return a JSON object (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
