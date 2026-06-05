@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Podcast Brief</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0C0F0A;
+      --surface: #161a13;
+      --border: #252a20;
+      --text: #e8f0e3;
+      --muted: #7a8a72;
+      --claude: #7AE05A;
+      --mistral: #A78AE0;
+      --danger: #e05a5a;
+    }
+
+    body {
+      font-family: 'IBM Plex Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+      padding-bottom: 40px;
+    }
+
+    header {
+      padding: 24px 0 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-top: 8px;
+      font-weight: 500;
+    }
+
+    .badge.claude { background: rgba(122,224,90,0.12); color: var(--claude); border: 1px solid rgba(122,224,90,0.25); }
+    .badge.mistral { background: rgba(167,138,224,0.12); color: var(--mistral); border: 1px solid rgba(167,138,224,0.25); }
+
+    .badge::before { content: '●'; font-size: 8px; }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 52px;
+      padding: 14px 20px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: var(--claude);
+      color: #0C0F0A;
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-copy {
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      min-height: 36px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      width: auto;
+    }
+
+    .btn-copy.copied { color: var(--claude); border-color: rgba(122,224,90,0.4); }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: #0C0F0A;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .step { display: none; }
+    .step.active { display: block; }
+
+    /* STEP 1 — Scan */
+    .scan-intro {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .scan-intro p { color: var(--muted); font-size: 13px; }
+
+    /* STEP 2 — News list */
+    .news-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+
+    .news-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .news-card:hover, .news-card.selected {
+      border-color: var(--claude);
+    }
+
+    .news-card.selected { background: rgba(122,224,90,0.05); }
+
+    .news-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+
+    .news-card h3 { font-size: 13px; font-weight: 500; line-height: 1.5; flex: 1; }
+
+    .score {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--claude);
+      background: rgba(122,224,90,0.12);
+      border-radius: 4px;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }
+
+    .news-card .source { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+    .tag {
+      font-size: 11px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      padding: 2px 8px;
+      color: var(--muted);
+    }
+
+    .why { font-size: 12px; color: var(--muted); margin-top: 10px; font-style: italic; }
+
+    /* STEP 3 — Brief */
+    .brief-container { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+
+    .brief-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .brief-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .brief-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .brief-section p, .brief-section li { font-size: 13px; line-height: 1.7; }
+
+    .brief-section ul { padding-left: 18px; }
+    .brief-section li { margin-bottom: 4px; }
+
+    .tech-zoom-needed {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .tech-zoom-needed.yes { background: rgba(122,224,90,0.12); color: var(--claude); }
+    .tech-zoom-needed.no { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+    .tradeoff {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(167,138,224,0.08);
+      border-left: 3px solid var(--mistral);
+      border-radius: 0 6px 6px 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .action-row { display: flex; flex-direction: column; gap: 10px; }
+
+    .error-box {
+      background: rgba(224,90,90,0.1);
+      border: 1px solid rgba(224,90,90,0.3);
+      border-radius: 10px;
+      padding: 16px;
+      color: #f0a0a0;
+      font-size: 13px;
+      display: none;
+    }
+
+    .error-box.visible { display: block; }
+
+    .model-row { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .back-btn:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Podcast Brief</h1>
+    <p>Data · IA · MLOps</p>
+  </header>
+
+  <div id="error-box" class="error-box"></div>
+
+  <!-- STEP 1: Scan -->
+  <div id="step-scan" class="step active">
+    <div class="scan-intro">
+      <p>Scanne l'actu data/IA/MLOps de la semaine et génère des briefs pour chaque segment.</p>
+    </div>
+    <button class="btn btn-primary" id="btn-scan" onclick="startScan()">
+      Scanner l'actu
+    </button>
+  </div>
+
+  <!-- STEP 2: Select -->
+  <div id="step-select" class="step">
+    <div class="model-row">
+      <span id="scan-model-badge" class="badge claude">Claude</span>
+    </div>
+    <div id="news-list" class="news-list"></div>
+    <div class="action-row">
+      <button class="btn btn-primary" id="btn-brief" onclick="generateBrief()" disabled>
+        Générer le brief
+      </button>
+      <button class="btn btn-secondary" onclick="goToStep('scan')">
+        Rescanner
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Brief -->
+  <div id="step-brief" class="step">
+    <button class="back-btn" onclick="goToStep('select')">← Retour</button>
+    <div class="model-row">
+      <span id="brief-model-badge" class="badge claude">Claude</span>
+    </div>
+    <div id="brief-container" class="brief-container"></div>
+    <div class="action-row">
+      <button class="btn btn-primary" onclick="shareBrief()">
+        Partager le brief
+      </button>
+      <button class="btn btn-secondary" onclick="goToStep('select')">
+        Autre actu
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let selectedNews = null;
+  let currentBrief = null;
+
+  function goToStep(step) {
+    document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+    document.getElementById('step-' + step).classList.add('active');
+    hideError();
+    window.scrollTo(0, 0);
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+
+  function hideError() {
+    document.getElementById('error-box').classList.remove('visible');
+  }
+
+  function setModelBadge(id, model) {
+    const el = document.getElementById(id);
+    el.className = 'badge ' + model;
+    el.textContent = model === 'claude' ? 'Claude' : 'Mistral';
+    // Re-add ::before via class (handled by CSS)
+  }
+
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (loading) {
+      btn.disabled = true;
+      btn.dataset.orig = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner"></span> Chargement…';
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = btn.dataset.orig || btn.innerHTML;
+    }
+  }
+
+  async function startScan() {
+    hideError();
+    setLoading('btn-scan', true);
+    try {
+      const res = await fetch('/api/scan', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Erreur lors du scan');
+      }
+      const data = await res.json();
+      renderNews(data.news, data.model_used);
+      setModelBadge('scan-model-badge', data.model_used);
+      goToStep('select');
+    } catch (e) {
+      showError(e.message || 'Les deux APIs sont indisponibles. Vérifie tes clés API.');
+    } finally {
+      setLoading('btn-scan', false);
+    }
+  }
+
+  function renderNews(news, model) {
+    selectedNews = null;
+    document.getElementById('btn-brief').disabled = true;
+    const list = document.getElementById('news-list');
+    list.innerHTML = '';
+    news.forEach((item, i) => {
+      const card = document.createElement('div');
+      card.className = 'news-card';
+      card.innerHTML = `
+        <div class="news-card-header">
+          <h3>${escHtml(item.title)}</h3>
+          <span class="score">${item.score}/10</span>
+        </div>
+        <div class="source">${escHtml(item.source)}</div>
+        <div class="tags">${(item.tags || []).map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>
+        <div class="why">${escHtml(item.why)}</div>
+      `;
+      card.addEventListener('click', () => selectNews(card, item));
+      list.appendChild(card);
+    });
+  }
+
+  function selectNews(card, item) {
+    document.querySelectorAll('.news-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedNews = item;
+    document.getElementById('btn-brief').disabled = false;
+  }
+
+  async function generateBrief() {
+    if (!selectedNews) return;
+    hideError();
+    setLoading('btn-brief', true);
+    try {
+      const res = await fetch('/api/brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: selectedNews.title,
+          source: selectedNews.source,
+          tags: selectedNews.tags || [],
+          why: selectedNews.why,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Erreur lors de la génération');
+      }
+      const data = await res.json();
+      currentBrief = data;
+      renderBrief(data);
+      setModelBadge('brief-model-badge', data.model_used);
+      goToStep('brief');
+    } catch (e) {
+      showError(e.message || 'Les deux APIs sont indisponibles. Vérifie tes clés API.');
+    } finally {
+      setLoading('btn-brief', false);
+    }
+  }
+
+  function renderBrief(brief) {
+    const container = document.getElementById('brief-container');
+    const tz = brief.tech_zoom || {};
+    container.innerHTML = `
+      ${briefSection('Hook', escHtml(brief.hook), 'hook-text')}
+      ${briefSection('Résumé', escHtml(brief.news_summary), 'summary-text')}
+      ${briefSection('Angle praticien', escHtml(brief.practitioner_angle), 'angle-text')}
+      <div class="brief-section">
+        <div class="brief-section-header">
+          <span class="brief-section-label">Tech Zoom</span>
+          <button class="btn-copy" onclick="copySection('techzoom-text', this)">Copier</button>
+        </div>
+        <span class="tech-zoom-needed ${tz.needed ? 'yes' : 'no'}">${tz.needed ? '✓ Nécessaire' : '— Optionnel'}</span>
+        <p id="techzoom-text"><strong>${escHtml(tz.concept || '')}</strong><br>${escHtml(tz.explanation || '')}</p>
+        ${tz.key_tradeoff ? `<div class="tradeoff">⚖ ${escHtml(tz.key_tradeoff)}</div>` : ''}
+      </div>
+      <div class="brief-section">
+        <div class="brief-section-header">
+          <span class="brief-section-label">Talking Points</span>
+          <button class="btn-copy" onclick="copySection('tp-text', this)">Copier</button>
+        </div>
+        <ul id="tp-text">${(brief.talking_points || []).map(tp => `<li>${escHtml(tp)}</li>`).join('')}</ul>
+      </div>
+      ${briefSection('Question finale', escHtml(brief.closing_question), 'closing-text')}
+    `;
+  }
+
+  function briefSection(label, content, id) {
+    return `
+      <div class="brief-section">
+        <div class="brief-section-header">
+          <span class="brief-section-label">${label}</span>
+          <button class="btn-copy" onclick="copySection('${id}', this)">Copier</button>
+        </div>
+        <p id="${id}">${content}</p>
+      </div>
+    `;
+  }
+
+  function copySection(id, btn) {
+    const el = document.getElementById(id);
+    const text = el ? el.innerText : '';
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copié';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 1800);
+    });
+  }
+
+  function shareBrief() {
+    if (!currentBrief) return;
+    const tz = currentBrief.tech_zoom || {};
+    const tps = (currentBrief.talking_points || []).map((tp, i) => `${i + 1}. ${tp}`).join('\n');
+    const text = [
+      `HOOK\n${currentBrief.hook}`,
+      `RÉSUMÉ\n${currentBrief.news_summary}`,
+      `ANGLE PRATICIEN\n${currentBrief.practitioner_angle}`,
+      `TECH ZOOM — ${tz.concept}\n${tz.explanation}`,
+      tz.key_tradeoff ? `⚖ ${tz.key_tradeoff}` : '',
+      `TALKING POINTS\n${tps}`,
+      `QUESTION FINALE\n${currentBrief.closing_question}`,
+    ].filter(Boolean).join('\n\n');
+
+    if (navigator.share) {
+      navigator.share({ title: 'Podcast Brief', text }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text);
+    }
+  }
+
+  function escHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>
