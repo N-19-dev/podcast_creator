@@ -58,16 +58,21 @@ GITHUB_TOPICS = [
 MIN_SCORE = 6  # items below this score are dropped — not worth a segment
 
 PODCAST_SCOPE = (
-    "The podcast is EDUCATIONAL first — the host wants listeners to learn something concrete and actionable. "
-    "Ideal topics: a new method or pattern being adopted across multiple projects in the wild "
-    "(e.g. Rust being used for agent management across many repos), a technique practitioners can apply, "
-    "a tool that changes how people work, or a research result with clear real-world implications.\n"
+    "The podcast is EDUCATIONAL first — the host wants listeners to learn something concrete and actionable.\n"
+    "IDEAL topics (score high):\n"
+    "  - A new method or pattern emerging across multiple independent projects "
+    "(e.g. Rust being adopted for agent management in many repos)\n"
+    "  - A new capability that introduces a new ARCHITECTURAL PATTERN practitioners can learn and apply "
+    "(e.g. Claude dynamic workflows — a new way to structure agents worth explaining step by step)\n"
+    "  - A tool or technique that can be demoed, explained, and applied by the listener's team\n"
+    "DISTINCTION for big-company announcements: ONLY include if it introduces a new technical concept "
+    "worth explaining (new pattern, new API capability, new architecture). "
+    "EXCLUDE if it is purely business news (funding, partnerships, market share) with nothing to teach.\n"
     "The podcast covers THREE equal pillars — do not over-represent any one:\n"
     "  1. Data Engineering (pipelines, orchestration, warehouses, dbt, Spark, Kafka, DuckDB…)\n"
-    "  2. MLOps (deployment, monitoring, feature stores, model lifecycle, Weights & Biases…)\n"
-    "  3. AI/LLM (only impactful releases or research — NOT every minor model update)\n"
-    "DEPRIORITIZE: opinion debates without technical substance, big-company announcements with no learnable content, "
-    "controversies and hot takes. The host is NOT looking for debate fodder."
+    "  2. MLOps (deployment, monitoring, feature stores, model lifecycle, observability…)\n"
+    "  3. AI/LLM (only when introducing a new architectural pattern or capability — not every model release)\n"
+    "DEPRIORITIZE: opinion debates, funding news, benchmark wars, controversies, hot takes without technical depth."
 )
 
 SCORE_RUBRIC = (
