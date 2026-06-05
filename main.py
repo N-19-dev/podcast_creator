@@ -336,7 +336,7 @@ async def scan_with_claude() -> dict | None:
             },
             json={
                 "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1500,
+                "max_tokens": 2500,
                 "tools": [{"type": "web_search_20250305", "name": "web_search"}],
                 "messages": [{"role": "user", "content": prompt}],
             },
@@ -406,7 +406,7 @@ async def scan_with_mistral() -> dict:
             json={
                 "model": "mistral-large-latest",
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1500,
+                "max_tokens": 2500,
             },
         )
         resp.raise_for_status()
@@ -424,19 +424,29 @@ async def brief_with_claude(req: BriefRequest) -> dict | None:
     if not ANTHROPIC_API_KEY:
         return None
     prompt = (
-        f"You are writing a segment brief for a French-language technical podcast on data/AI/MLOps.\n"
-        f"Tone: casual conversation between two data engineers at a bar — curious, a bit excited, zero corporate speak. "
-        f"Like 'attends, t'as vu ce truc ? c'est dingue parce que…' Not a lecture, not a press release.\n"
-        f"News item: {req.title} (source: {req.source})\n"
+        f"You are writing a podcast segment brief in French for a data/AI/MLOps technical podcast.\n"
+        f"TONE: like explaining something cool to a friend at a bar. Casual, direct, no filler. "
+        f"Not 'Dans cet épisode nous allons explorer…' but more like 'En gros t'as un truc qui fait X et c'est ouf parce que…'. "
+        f"Don't over-explain, don't be formal. Keep it tight.\n\n"
+        f"Topic: {req.title} (source: {req.source})\n"
         f"Tags: {', '.join(req.tags)}\n"
-        f"What makes it interesting: {req.why}\n\n"
+        f"Why it's interesting: {req.why}\n\n"
         "Return a JSON object (no markdown, raw JSON only) with this exact structure:\n"
-        '{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
-        '"tech_zoom": {"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}, '
-        '"talking_points": ["...", "...", "..."], "closing_question": "..."}\n'
-        "hook: 1-2 sentences that sound like something you'd say to open the topic at a bar — surprising, concrete, makes the listener lean in.\n"
-        "talking_points: 3 points that walk through the concept naturally — what it is, why it's cool, what you'd do with it.\n"
-        "closing_question: something you'd genuinely ask a colleague, not a formal wrap-up."
+        '{{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
+        '"tech_zoom": {{"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}}, '
+        '"talking_points": ["...", "...", "..."], "closing_question": "...", '
+        '"mini_project": {{"title": "...", "goal": "...", "steps": ["...", "...", "...", "..."]}}}}\n\n'
+        "hook: 1-2 sentences max, the way you'd open this topic with a friend — punchy and concrete.\n"
+        "news_summary: 2-3 sentences explaining what happened, plain language.\n"
+        "practitioner_angle: 1-2 sentences on why a data engineer or ML practitioner cares.\n"
+        "tech_zoom.concept: the core technical concept in plain words.\n"
+        "tech_zoom.explanation: explain the concept clearly — this is the pedagogical part, keep it simple but precise.\n"
+        "tech_zoom.key_tradeoff: 1 sentence on the main tradeoff or gotcha to know.\n"
+        "talking_points: 3 natural talking points, like you'd walk through it with a colleague — what it is, how it works, real example.\n"
+        "closing_question: 1 casual question you'd throw to the listener, like 'et vous vous l'utiliseriez comment ?'\n"
+        "mini_project: a small hands-on project (30min–2h) to actually try the concept. "
+        "title: short project name. goal: 1 sentence on what you'll prove. "
+        "steps: 3-5 concrete steps with specific tools/commands/code snippets where relevant — no vague instructions."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -448,7 +458,7 @@ async def brief_with_claude(req: BriefRequest) -> dict | None:
             },
             json={
                 "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1500,
+                "max_tokens": 2500,
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
@@ -473,19 +483,29 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
     if not MISTRAL_API_KEY:
         raise HTTPException(status_code=503, detail="No AI API available")
     prompt = (
-        f"You are writing a segment brief for a French-language technical podcast on data/AI/MLOps.\n"
-        f"Tone: casual conversation between two data engineers at a bar — curious, a bit excited, zero corporate speak. "
-        f"Like 'attends, t'as vu ce truc ? c'est dingue parce que…' Not a lecture, not a press release.\n"
-        f"News item: {req.title} (source: {req.source})\n"
+        f"You are writing a podcast segment brief in French for a data/AI/MLOps technical podcast.\n"
+        f"TONE: like explaining something cool to a friend at a bar. Casual, direct, no filler. "
+        f"Not 'Dans cet épisode nous allons explorer…' but more like 'En gros t'as un truc qui fait X et c'est ouf parce que…'. "
+        f"Don't over-explain, don't be formal. Keep it tight.\n\n"
+        f"Topic: {req.title} (source: {req.source})\n"
         f"Tags: {', '.join(req.tags)}\n"
-        f"What makes it interesting: {req.why}\n\n"
+        f"Why it's interesting: {req.why}\n\n"
         "Return a JSON object (no markdown, raw JSON only) with this exact structure:\n"
-        '{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
-        '"tech_zoom": {"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}, '
-        '"talking_points": ["...", "...", "..."], "closing_question": "..."}\n'
-        "hook: 1-2 sentences that sound like something you'd say to open the topic at a bar — surprising, concrete, makes the listener lean in.\n"
-        "talking_points: 3 points that walk through the concept naturally — what it is, why it's cool, what you'd do with it.\n"
-        "closing_question: something you'd genuinely ask a colleague, not a formal wrap-up."
+        '{{"hook": "...", "news_summary": "...", "practitioner_angle": "...", '
+        '"tech_zoom": {{"needed": true, "concept": "...", "explanation": "...", "key_tradeoff": "..."}}, '
+        '"talking_points": ["...", "...", "..."], "closing_question": "...", '
+        '"mini_project": {{"title": "...", "goal": "...", "steps": ["...", "...", "...", "..."]}}}}\n\n'
+        "hook: 1-2 sentences max, the way you'd open this topic with a friend — punchy and concrete.\n"
+        "news_summary: 2-3 sentences explaining what happened, plain language.\n"
+        "practitioner_angle: 1-2 sentences on why a data engineer or ML practitioner cares.\n"
+        "tech_zoom.concept: the core technical concept in plain words.\n"
+        "tech_zoom.explanation: explain the concept clearly — this is the pedagogical part, keep it simple but precise.\n"
+        "tech_zoom.key_tradeoff: 1 sentence on the main tradeoff or gotcha to know.\n"
+        "talking_points: 3 natural talking points, like you'd walk through it with a colleague — what it is, how it works, real example.\n"
+        "closing_question: 1 casual question you'd throw to the listener, like 'et vous vous l'utiliseriez comment ?'\n"
+        "mini_project: a small hands-on project (30min–2h) to actually try the concept. "
+        "title: short project name. goal: 1 sentence on what you'll prove. "
+        "steps: 3-5 concrete steps with specific tools/commands/code snippets where relevant — no vague instructions."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -494,7 +514,7 @@ async def brief_with_mistral(req: BriefRequest) -> dict:
             json={
                 "model": "mistral-large-latest",
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 1500,
+                "max_tokens": 2500,
             },
         )
         resp.raise_for_status()

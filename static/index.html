@@ -249,6 +249,35 @@
       color: var(--muted);
     }
 
+    .mini-project { border-color: rgba(122,224,90,0.3); background: rgba(122,224,90,0.04); }
+
+    .mp-goal { font-size: 13px; margin-bottom: 12px; color: var(--claude); }
+
+    .mp-steps { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+    .mp-steps li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(122,224,90,0.15);
+      color: var(--claude);
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+    }
+
     .action-row { display: flex; flex-direction: column; gap: 10px; }
 
     .error-box {
@@ -495,6 +524,24 @@
         <ul id="tp-text">${(brief.talking_points || []).map(tp => `<li>${escHtml(tp)}</li>`).join('')}</ul>
       </div>
       ${briefSection('Question finale', escHtml(brief.closing_question), 'closing-text')}
+      ${renderMiniProject(brief.mini_project)}
+    `;
+  }
+
+  function renderMiniProject(mp) {
+    if (!mp) return '';
+    const steps = (mp.steps || []).map((s, i) =>
+      `<li><span class="step-num">${i + 1}</span>${escHtml(s)}</li>`
+    ).join('');
+    return `
+      <div class="brief-section mini-project">
+        <div class="brief-section-header">
+          <span class="brief-section-label">Essaie le concept</span>
+          <button class="btn-copy" onclick="copySection('mp-text', this)">Copier</button>
+        </div>
+        <p class="mp-goal" id="mp-text">${escHtml(mp.title || '')} — ${escHtml(mp.goal || '')}</p>
+        <ol class="mp-steps">${steps}</ol>
+      </div>
     `;
   }
 
