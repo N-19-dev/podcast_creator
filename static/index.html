@@ -249,6 +249,16 @@
       color: var(--muted);
     }
 
+    .brief-source-link { margin-bottom: 12px; }
+    .brief-source-link a {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: none;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1px;
+    }
+    .brief-source-link a:hover { color: var(--text); }
+
     .mini-project { border-color: rgba(122,224,90,0.3); background: rgba(122,224,90,0.04); }
 
     .mp-goal { font-size: 13px; margin-bottom: 12px; color: var(--claude); }
@@ -480,6 +490,7 @@
         body: JSON.stringify({
           title: selectedNews.title,
           source: selectedNews.source,
+          url: selectedNews.url || '',
           tags: selectedNews.tags || [],
           why: selectedNews.why,
         }),
@@ -504,6 +515,7 @@
     const container = document.getElementById('brief-container');
     const tz = brief.tech_zoom || {};
     container.innerHTML = `
+      ${brief.url ? `<div class="brief-source-link"><a href="${escHtml(brief.url)}" target="_blank" rel="noopener">${escHtml(brief.source)} ↗</a></div>` : ''}
       ${briefSection('Hook', escHtml(brief.hook), 'hook-text')}
       ${briefSection('Résumé', escHtml(brief.news_summary), 'summary-text')}
       ${briefSection('Angle praticien', escHtml(brief.practitioner_angle), 'angle-text')}

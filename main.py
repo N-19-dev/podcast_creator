@@ -107,6 +107,7 @@ app = FastAPI(lifespan=lifespan)
 class BriefRequest(BaseModel):
     title: str
     source: str
+    url: str = ""
     tags: list[str]
     why: str
 
@@ -550,10 +551,15 @@ async def brief(req: BriefRequest):
     try:
         result = await brief_with_claude(req)
         if result:
+            result["url"] = req.url
+            result["source"] = req.source
             return result
     except Exception:
         pass
-    return await brief_with_mistral(req)
+    result = await brief_with_mistral(req)
+    result["url"] = req.url
+    result["source"] = req.source
+    return result
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
