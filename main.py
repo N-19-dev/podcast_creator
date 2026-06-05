@@ -55,7 +55,7 @@ GITHUB_TOPICS = [
     "llm", "rag",
 ]
 
-MIN_SCORE = 7  # raised — only genuinely interesting topics pass
+MIN_SCORE = 8  # only genuinely surprising topics pass
 
 PODCAST_SCOPE = (
     "TONE: this podcast sounds like a conversation between two data engineers at a bar — "
@@ -83,14 +83,16 @@ PODCAST_SCOPE = (
 )
 
 SCORE_RUBRIC = (
-    "Score with the BAR TEST — would a senior data engineer genuinely bring this up with a friend over a drink?\n"
-    "  9-10 = 'attends t'as vu ça ?!' — surprising, novel, makes you want to try it immediately; "
-    "         pattern emerging in the wild OR new capability that changes how you build things\n"
-    "   7-8 = good topic — concrete enough to explain and demo, something you'd mention casually\n"
-    "   5-6 = meh — not surprising, already known, or too abstract to make concrete\n"
-    "   1-4 = skip — press release energy, funding news, benchmark war, already everywhere\n"
-    "Be strict. An empty list is better than a list of mediocre topics. "
-    "If it sounds like a LinkedIn post, score it 1-4."
+    "YOUR DEFAULT ANSWER IS AN EMPTY LIST. Only add an item if you would genuinely "
+    "text it to a data engineer friend right now saying 'attends t'as vu ça ?'\n\n"
+    "Score with the BAR TEST — not 'is this relevant?' but 'is this genuinely surprising?'\n"
+    "  9-10 = you'd stop mid-sentence to show your phone screen to the person next to you\n"
+    "   8   = you'd bring it up naturally, it's fresh and concrete enough to explain in 2 minutes\n"
+    "   7   = mildly interesting but you've seen similar things before → score 7, do NOT include\n"
+    "  1-6  = LinkedIn post, press release, already everywhere, nothing new → do NOT include\n\n"
+    "CRITICAL: most weeks, the correct answer is 0 items or 1-2 items. "
+    "Returning 4-5 items means you lowered your standards. "
+    "A score of 8 must mean genuinely surprising — not just 'relevant to data engineers'."
 )
 
 
@@ -314,7 +316,9 @@ async def scan_with_claude() -> dict | None:
         f"Also consider these pre-fetched sources:{extra_context}\n"
         "Select the best items across all sources (web search + GitHub + ArXiv + Reddit + RSS blogs). "
         f"{SCORE_RUBRIC}\n"
-        "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
+        "Return ONLY items scoring 8 or above. Most weeks you should return 0-2 items. "
+        "Returning more than 3 means you inflated scores — revise down. "
+        "If nothing is genuinely surprising this week, return {\"news\": []} — that is the expected and correct answer. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
@@ -385,7 +389,9 @@ async def scan_with_mistral() -> dict:
         f"Here are recent items from multiple sources:\n\n{context_text}"
         "Select the best items across all sources, respecting the pillar balance above. "
         f"{SCORE_RUBRIC}\n"
-        "Return ONLY items scoring 7 or above. If nothing clears that bar, return {\"news\": []}. "
+        "Return ONLY items scoring 8 or above. Most weeks you should return 0-2 items. "
+        "Returning more than 3 means you inflated scores — revise down. "
+        "If nothing is genuinely surprising this week, return {\"news\": []} — that is the expected and correct answer. "
         "Return a JSON object (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'

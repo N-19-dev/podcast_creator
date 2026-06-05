@@ -405,9 +405,10 @@
     if (!news || news.length === 0) {
       list.innerHTML = `
         <div class="scan-intro">
-          <p style="color:var(--muted)">Rien de suffisamment percutant cette semaine.<br>
-          Aucun sujet n'a atteint le seuil de qualité pour le podcast.<br>
-          Réessaie dans quelques jours ou relance le scan.</p>
+          <p style="color:var(--muted); font-size:15px; line-height:1.8">
+            Rien cette semaine.<br>
+            <span style="font-size:12px">C'est normal — pas d'épisode vaut mieux qu'un épisode banal.</span>
+          </p>
         </div>`;
       return;
     }
