@@ -1,6 +1,8 @@
 import os
 import json
+import asyncio
 from contextlib import asynccontextmanager
+from datetime import date, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -16,6 +18,7 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 ANTHROPIC_BASE = "https://api.anthropic.com/v1"
 MISTRAL_BASE = "https://api.mistral.ai/v1"
 HN_BASE = "https://hacker-news.firebaseio.com/v0"
+GITHUB_API = "https://api.github.com/search/repositories"
 
 HN_KEYWORDS = {
     "data", "ml", "ai", "llm", "mlops", "dbt", "spark", "kafka", "flink",
@@ -24,6 +27,11 @@ HN_KEYWORDS = {
     "openai", "anthropic", "mistral", "gemini", "huggingface",
     "databricks", "snowflake", "duckdb", "polars", "pandas", "python",
 }
+
+GITHUB_TOPICS = [
+    "llm", "mlops", "data-engineering", "machine-learning",
+    "rag", "vector-database", "dbt", "data-pipeline",
+]
 
 
 @asynccontextmanager
@@ -47,7 +55,6 @@ async def fetch_hn_news() -> list[dict]:
         resp.raise_for_status()
         story_ids = resp.json()[:100]
 
-        import asyncio
         async def fetch_item(sid: int) -> dict | None:
             try:
                 r = await client.get(f"{HN_BASE}/item/{sid}.json")
@@ -64,6 +71,7 @@ async def fetch_hn_news() -> list[dict]:
         title_lower = s["title"].lower()
         if any(kw in title_lower for kw in HN_KEYWORDS):
             results.append({
+                "source": "Hacker News",
                 "title": s["title"],
                 "url": s.get("url", f"https://news.ycombinator.com/item?id={s['id']}"),
                 "description": f"HN score: {s.get('score', 0)} — {s.get('descendants', 0)} comments",
@@ -73,18 +81,54 @@ async def fetch_hn_news() -> list[dict]:
     return results[:10]
 
 
+async def fetch_github_trending() -> list[dict]:
+    since = (date.today() - timedelta(days=14)).isoformat()
+    results = []
+    async with httpx.AsyncClient(timeout=20) as client:
+        for topic in GITHUB_TOPICS[:4]:
+            try:
+                resp = await client.get(
+                    GITHUB_API,
+                    headers={"Accept": "application/vnd.github+json"},
+                    params={
+                        "q": f"topic:{topic} pushed:>{since} stars:>50",
+                        "sort": "stars",
+                        "order": "desc",
+                        "per_page": 3,
+                    },
+                )
+                if resp.status_code != 200:
+                    continue
+                for repo in resp.json().get("items", []):
+                    results.append({
+                        "source": "GitHub",
+                        "title": f"{repo['full_name']} — {repo.get('description', '')}",
+                        "url": repo["html_url"],
+                        "description": (
+                            f"★ {repo.get('stargazers_count', 0)} stars "
+                            f"({repo.get('stargazers_count', 0) - repo.get('watchers_count', 0):+d} recent) — "
+                            f"topics: {', '.join(repo.get('topics', [])[:5])}"
+                        ),
+                    })
+            except Exception:
+                continue
+    return results[:8]
+
+
 async def scan_with_claude() -> dict | None:
     if not ANTHROPIC_API_KEY:
         return None
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        "Search the web for the top 5 news items from this week in data engineering, AI, or MLOps. "
+        "Search the web AND GitHub for the top 5 items from this week in data engineering, AI, or MLOps. "
+        "Include trending GitHub repos if they represent a new tool, pattern, or practice worth discussing. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
-        "score 1-10: rate PODCAST VALUE specifically — does it spark debate? can we teach a concept from it? will practitioners change how they work? is it timely this week? "
-        "tech_zoom: 1-sentence technical focus of the item. "
-        "why: 1 sentence on what makes this a strong PODCAST SEGMENT — name the angle: a debate to frame, a concept to teach, a surprising practitioner shift, or a hot take worth unpacking."
+        "source: the publication name or 'GitHub' for repos. "
+        "score 1-10: rate PODCAST VALUE — does it spark debate? can we teach a concept from it? will practitioners change how they work? is it timely? "
+        "tech_zoom: 1-sentence technical focus. "
+        "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -122,19 +166,32 @@ async def scan_with_claude() -> dict | None:
 async def scan_with_mistral() -> dict:
     if not MISTRAL_API_KEY:
         raise HTTPException(status_code=503, detail="No AI API available")
-    news_context = await fetch_hn_news()
-    context_text = "\n".join(
-        f"- {item['title']} ({item['url']}): {item['description']}" for item in news_context
-    ) or "No results from Hacker News."
+    hn_items, gh_items = await asyncio.gather(fetch_hn_news(), fetch_github_trending())
+
+    def fmt(items: list[dict]) -> str:
+        return "\n".join(
+            f"- [{item['source']}] {item['title']} ({item['url']}): {item['description']}"
+            for item in items
+        )
+
+    context_text = ""
+    if hn_items:
+        context_text += f"## Hacker News\n{fmt(hn_items)}\n\n"
+    if gh_items:
+        context_text += f"## GitHub Trending\n{fmt(gh_items)}\n"
+    if not context_text:
+        context_text = "No external results available."
+
     prompt = (
         "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
-        f"Here are recent news snippets from Hacker News:\n{context_text}\n\n"
-        "Based on these, return the top 5 items as a JSON object (no markdown, raw JSON only):\n"
+        f"Here are recent items from Hacker News and GitHub trending repos:\n\n{context_text}\n"
+        "Pick the top 5 items (mix of news and GitHub repos is fine) and return a JSON object (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
-        "score 1-10: rate PODCAST VALUE specifically — does it spark debate? can we teach a concept from it? will practitioners change how they work? is it timely? "
-        "tech_zoom: 1-sentence technical focus of the item. "
-        "why: 1 sentence on what makes this a strong PODCAST SEGMENT — name the angle: a debate to frame, a concept to teach, a surprising practitioner shift, or a hot take worth unpacking."
+        "source: publication name or 'GitHub'. "
+        "score 1-10: rate PODCAST VALUE — debate potential, teachable concept, new practice, practitioner impact, timeliness. "
+        "tech_zoom: 1-sentence technical focus. "
+        "why: 1 sentence on the PODCAST ANGLE — a debate to frame, a concept to teach, a new practice to explore, or a hot take worth unpacking."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(

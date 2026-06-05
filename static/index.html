@@ -171,7 +171,17 @@
       white-space: nowrap;
     }
 
-    .news-card .source { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .news-card .source { color: var(--muted); font-size: 12px; margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+
+    .source-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+    }
+    .source-badge.github { background: rgba(255,255,255,0.08); color: #e8f0e3; }
+    .source-badge.hn     { background: rgba(255,102,0,0.15);  color: #ff8c42; }
 
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
@@ -396,7 +406,10 @@
           <h3>${escHtml(item.title)}</h3>
           <span class="score">${item.score}/10</span>
         </div>
-        <div class="source">${escHtml(item.source)}</div>
+        <div class="source">
+          ${sourceBadge(item.source)}
+          ${escHtml(item.source)}
+        </div>
         <div class="tags">${(item.tags || []).map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>
         <div class="why">🎙 ${escHtml(item.why)}</div>
       `;
@@ -511,6 +524,14 @@
     } else {
       navigator.clipboard.writeText(text);
     }
+  }
+
+  function sourceBadge(source) {
+    if (!source) return '';
+    const s = source.toLowerCase();
+    if (s === 'github') return '<span class="source-badge github">GitHub</span>';
+    if (s === 'hacker news') return '<span class="source-badge hn">HN</span>';
+    return '';
   }
 
   function escHtml(str) {
