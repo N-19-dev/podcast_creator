@@ -77,12 +77,14 @@ async def scan_with_claude() -> dict | None:
     if not ANTHROPIC_API_KEY:
         return None
     prompt = (
-        "You are a researcher for a French-language data/AI/MLOps technical podcast. "
-        "Search the web for the top 5 most relevant news items from this week in data engineering, AI, or MLOps. "
+        "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
+        "Search the web for the top 5 news items from this week in data engineering, AI, or MLOps. "
         "Return a JSON object with this exact structure (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
-        "score is 1-10 relevance. tech_zoom is a 1-sentence technical focus. why is 1 sentence on why practitioners care."
+        "score 1-10: rate PODCAST VALUE specifically — does it spark debate? can we teach a concept from it? will practitioners change how they work? is it timely this week? "
+        "tech_zoom: 1-sentence technical focus of the item. "
+        "why: 1 sentence on what makes this a strong PODCAST SEGMENT — name the angle: a debate to frame, a concept to teach, a surprising practitioner shift, or a hot take worth unpacking."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
@@ -125,12 +127,14 @@ async def scan_with_mistral() -> dict:
         f"- {item['title']} ({item['url']}): {item['description']}" for item in news_context
     ) or "No results from Hacker News."
     prompt = (
-        "You are a researcher for a French-language data/AI/MLOps technical podcast. "
-        f"Here are recent news snippets:\n{context_text}\n\n"
-        "Based on these, return the top 5 most relevant items as a JSON object (no markdown, raw JSON only):\n"
+        "You are a researcher for a French-language data/AI/MLOps technical podcast targeting senior data engineers and ML practitioners. "
+        f"Here are recent news snippets from Hacker News:\n{context_text}\n\n"
+        "Based on these, return the top 5 items as a JSON object (no markdown, raw JSON only):\n"
         '{"news": [{"title": "...", "source": "...", "score": 8, "tags": ["dbt", "LLM"], '
         '"tech_zoom": "...", "why": "..."}]}\n'
-        "score is 1-10 relevance. tech_zoom is a 1-sentence technical focus. why is 1 sentence on why practitioners care."
+        "score 1-10: rate PODCAST VALUE specifically — does it spark debate? can we teach a concept from it? will practitioners change how they work? is it timely? "
+        "tech_zoom: 1-sentence technical focus of the item. "
+        "why: 1 sentence on what makes this a strong PODCAST SEGMENT — name the angle: a debate to frame, a concept to teach, a surprising practitioner shift, or a hot take worth unpacking."
     )
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
